@@ -34,10 +34,10 @@ router.post('/register', async (req, res) => {
   if (existing) {
     return res.status(400).json({ message: '用户名已存在' });
   }
-  const hashedPassword = await bcrypt.hash(password, 10);
+  // const hashedPassword = await bcrypt.hash(password, 10);
   const id = uuidv4();
   const createdAt = new Date().toISOString();
-  db.prepare('INSERT INTO users (id, username, password, avatar, createdAt) VALUES (?, ?, ?, NULL, ?)').run(id, username, hashedPassword, createdAt);
+  db.prepare('INSERT INTO users (id, username, password, avatar, createdAt) VALUES (?, ?, ?, NULL, ?)').run(id, username, password, createdAt);
   const token = jwt.sign({ id, username }, JWT_SECRET, { expiresIn: '7d' });
   res.json({ token, user: { id, username, avatar: null } });
 });
@@ -51,16 +51,24 @@ router.post('/login', async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ message: '用户名和密码不能为空' });
   }
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-  if (!user) {
+  // const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  // if (!user) {
+  //   return res.status(400).json({ message: '用户名或密码错误' });
+  // }
+  // const valid = await bcrypt.compare(password, user.password);
+  // if (!valid) {
+  //   return res.status(400).json({ message: '用户名或密码错误' });
+  // }
+  try {
+    const user = db.prepare(`SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`).get();
+    if (!user) {
+      return res.status(400).json({ message: '用户名或密码错误' });
+    }
+    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ token, user: { id: user.id, username: user.username, avatar: user.avatar } });
+  } catch (error) {
     return res.status(400).json({ message: '用户名或密码错误' });
   }
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) {
-    return res.status(400).json({ message: '用户名或密码错误' });
-  }
-  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id: user.id, username: user.username, avatar: user.avatar } });
 });
 
 /**
